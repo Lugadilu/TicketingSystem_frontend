@@ -1,0 +1,1274 @@
+// src/pages/Dashboard.tsx - USES SIDEBAR COMPONENT
+
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
+import Sidebar from '../components/sidebar';
+import TicketDetailModal from '../components/TicketDetailModal';
+import { ThemeToggle } from '../components/ui/theme-toggle';
+import type { TicketListItem, PaginatedTicketsResponse } from '../types';
+import { PRIORITY_LEVELS, STATUS_LABELS } from '../types';
+import apiClient from '../services/api';
+
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const { user, clearAuth } = useAuthStore();
+
+  // Sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Data state
+  const [tickets, setTickets] = useState<TicketListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<number | 'all'>('all');
+  const [pageNumber, setPageNumber] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState({
+    total: 0,
+    open: 0,
+    inProgress: 0,
+    resolved: 0,
+    highPriority: 0,
+  });
+
+  // Modal state
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+  const pageSize = 10;
+
+  // Fetch tickets on load and when filters change
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    fetchTickets();
+    fetchStats();
+  }, [statusFilter, pageNumber, user, navigate]);
+
+  const fetchTickets = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      let url = '/tickets/my-tickets';
+      const params = new URLSearchParams({
+        pageNumber: pageNumber.toString(),
+        pageSize: pageSize.toString(),
+      });
+
+      if (statusFilter !== 'all') {
+        url = `/tickets/by-status/${statusFilter}`;
+      }
+
+      const fullUrl = `${url}?${params.toString()}`;
+      const response = await apiClient.get(fullUrl);
+
+      let ticketsData: TicketListItem[] = [];
+      let count = 0;
+
+      if (response.data?.data) {
+        const paginatedData = response.data.data as PaginatedTicketsResponse;
+        ticketsData = paginatedData.items || [];
+        count = paginatedData.totalCount || 0;
+      } else if (response.data?.items) {
+        ticketsData = response.data.items || [];
+        count = response.data.totalCount || 0;
+      } else if (Array.isArray(response.data)) {
+        ticketsData = response.data;
+        count = ticketsData.length;
+      }
+
+      setTickets(ticketsData);
+      setTotalCount(count);
+    } catch (err: any) {
+      console.error('Error fetching tickets:', err);
+      const errorMsg =
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to load tickets';
+      setError(errorMsg);
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    // Mock stats - replace with actual API call
+    setStats({
+      total: totalCount || 24,
+      open: 8,
+      inProgress: 5,
+      resolved: 11,
+      highPriority: 3,
+    });
+  };
+
+  const handleLogout = () => {
+    setIsLogoutModalOpen(true);
+  };
+
+  const confirmLogout = () => {
+    setIsLogoutModalOpen(false);
+    clearAuth();
+    navigate('/login');
+  };
+
+  const handleViewTicket = (ticketId: string) => {
+    setSelectedTicketId(ticketId);
+    setIsModalOpen(true);
+  };
+
+  const getPriorityColor = (priority: number): string => {
+    switch (priority) {
+      case 1:
+        return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200';
+      case 2:
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200';
+      case 3:
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200';
+      case 4:
+        return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+    }
+  };
+
+  const getStatusColor = (status: number): string => {
+    switch (status) {
+      case 1:
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border-blue-200 dark:border-blue-800';
+      case 2:
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200 border-orange-200 dark:border-orange-800';
+      case 3:
+        return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200 border-green-200 dark:border-green-800';
+      case 4:
+        return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200 border-red-200 dark:border-red-800';
+      case 5:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700';
+    }
+  };
+
+  const getPriorityBgColor = (priority: number): string => {
+    switch (priority) {
+      case 1:
+        return 'bg-green-50/50 dark:bg-green-950/20';
+      case 2:
+        return 'bg-blue-50/50 dark:bg-blue-950/20';
+      case 3:
+        return 'bg-orange-50/50 dark:bg-orange-950/20';
+      case 4:
+        return 'bg-red-50/50 dark:bg-red-950/20';
+      default:
+        return 'bg-gray-50/50 dark:bg-slate-800/50';
+    }
+  };
+
+  const getStatusIcon = (status: number) => {
+    switch (status) {
+      case 1:
+        return (
+          <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+          </svg>
+        );
+      case 2:
+        return (
+          <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+        );
+      case 3:
+        return (
+          <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex">
+      {/* Sidebar Component */}
+      <Sidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
+        onLogout={handleLogout}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Header */}
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
+          <div className="flex items-center gap-4">
+            {/* Mobile Menu Button */}
+            <button 
+              onClick={() => setMobileMenuOpen(true)}
+              className="lg:hidden p-2 -ml-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            {/* Sidebar Toggle (Desktop) */}
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="hidden lg:flex p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            >
+              <svg 
+                className={`w-5 h-5 transition-transform duration-200 ${!sidebarOpen ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
+
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Tickets</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">Manage and track your support requests</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            
+            {/* Quick Action */}
+            <button
+              onClick={() => navigate('/create-ticket')}
+              className="hidden sm:flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors shadow-sm hover:shadow-md"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New Ticket
+            </button>
+          </div>
+        </header>
+
+        {/* Dashboard Content */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-gray-200 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tickets</span>
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">All time requests</p>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-gray-200 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Open</span>
+                <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                  <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.open}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Awaiting response</p>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-gray-200 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</span>
+                <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.inProgress}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Being handled</p>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-gray-200 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Resolved</span>
+                <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.resolved}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Completed this month</p>
+            </div>
+          </div>
+
+          {/* Filters & Actions Bar */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-4 mb-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Filter:</span>
+                <button
+                  onClick={() => {
+                    setStatusFilter('all');
+                    setPageNumber(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+                    statusFilter === 'all'
+                      ? 'bg-blue-600 dark:bg-blue-700 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  All
+                </button>
+                {[1, 2, 3, 4, 5].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => {
+                      setStatusFilter(status);
+                      setPageNumber(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+                      statusFilter === status
+                        ? 'bg-blue-600 dark:bg-blue-700 text-white shadow-md'
+                        : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {STATUS_LABELS[status as keyof typeof STATUS_LABELS]}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Showing <span className="font-semibold text-gray-900 dark:text-white">{tickets.length}</span> of{' '}
+                  <span className="font-semibold text-gray-900 dark:text-white">{totalCount}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Loading State */}
+          {loading && (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">Loading tickets...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && !loading && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 mb-6">
+              <div className="flex items-start">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <div>
+                  <h3 className="text-red-900 dark:text-red-100 font-semibold mb-1">Failed to load tickets</h3>
+                  <p className="text-red-700 dark:text-red-200 text-sm">{error}</p>
+                  <button 
+                    onClick={fetchTickets}
+                    className="mt-3 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tickets Table */}
+          {!loading && tickets.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50/50 dark:bg-slate-800/50 border-b border-gray-200 dark:border-slate-700">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Ticket
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Title
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Priority
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Created
+                      </th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                    {tickets.map((ticket) => (
+                      <tr
+                        key={ticket.id}
+                        className={`hover:bg-gray-50/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${getPriorityBgColor(ticket.priority)}`}
+                        onClick={() => handleViewTicket(ticket.id)}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                            #{ticket.ticketNumber}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1">
+                            {ticket.title}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(ticket.status)}`}>
+                            {getStatusIcon(ticket.status)}
+                            {STATUS_LABELS[ticket.status as keyof typeof STATUS_LABELS]}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getPriorityColor(ticket.priority)}`}>
+                            {PRIORITY_LEVELS[ticket.priority as keyof typeof PRIORITY_LEVELS]}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {new Date(ticket.createdAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewTicket(ticket.id);
+                            }}
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 font-medium text-sm inline-flex items-center gap-1 group"
+                          >
+                            View
+                            <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {totalCount > pageSize && (
+                <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex items-center justify-between">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Page <span className="font-medium text-gray-900 dark:text-white">{pageNumber}</span> of{' '}
+                    <span className="font-medium text-gray-900 dark:text-white">{Math.ceil(totalCount / pageSize)}</span>
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPageNumber(Math.max(1, pageNumber - 1))}
+                      disabled={pageNumber === 1}
+                      className="px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setPageNumber(Math.min(Math.ceil(totalCount / pageSize), pageNumber + 1))}
+                      disabled={pageNumber >= Math.ceil(totalCount / pageSize)}
+                      className="px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && tickets.length === 0 && !error && (
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-12 text-center">
+              <div className="w-20 h-20 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-10 h-10 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                {statusFilter === 'all' ? 'No tickets yet' : 'No tickets found'}
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                {statusFilter === 'all' 
+                  ? "You haven't created any support tickets yet. Create your first ticket to get help from our support team."
+                  : `No tickets with status "${STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS]}" found.`}
+              </p>
+              <button
+                onClick={() => navigate('/create-ticket')}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-colors shadow-sm hover:shadow-md"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create Your First Ticket
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Ticket Detail Modal */}
+      <TicketDetailModal
+        ticketId={selectedTicketId || ''}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedTicketId(null);
+        }}
+      />
+
+      {/* Logout Confirmation Modal */}
+      {isLogoutModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200 dark:border-slate-700 transform transition-all">
+            <div className="p-6">
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-center text-gray-900 dark:text-white mb-2">Confirm Logout</h3>
+              <p className="text-center text-gray-600 dark:text-gray-400 mb-6">
+                Are you sure you want to log out? You'll need to sign in again to access your tickets.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setIsLogoutModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmLogout}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-lg transition-colors shadow-sm"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // src/pages/Dashboard.tsx
+
+// import { useState, useEffect } from 'react';
+// import { useNavigate, useLocation } from 'react-router-dom';
+// import { useAuthStore } from '../store/authStore';
+// import TicketDetailModal from '../components/TicketDetailModal';
+// import { ThemeToggle } from '../components/ui/theme-toggle';
+// import type { TicketListItem, PaginatedTicketsResponse } from '../types';
+// import { PRIORITY_LEVELS, STATUS_LABELS } from '../types';
+// import apiClient from '../services/api';
+
+// // Navigation items for sidebar
+// const navigation = [
+//   { name: 'Dashboard', href: '/dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+//   { name: 'My Tickets', href: '/dashboard', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+//   { name: 'Create Ticket', href: '/create-ticket', icon: 'M12 4v16m8-8H4' },
+//   { name: 'Analytics', href: '#', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+//   { name: 'Settings', href: '#', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
+// ];
+
+// export default function Dashboard() {
+//   const navigate = useNavigate();
+//   const location = useLocation();
+//   const { user, clearAuth } = useAuthStore();
+
+//   // Sidebar state
+//   const [sidebarOpen, setSidebarOpen] = useState(true);
+//   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+//   // Data state
+//   const [tickets, setTickets] = useState<TicketListItem[]>([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState<string | null>(null);
+//   const [statusFilter, setStatusFilter] = useState<number | 'all'>('all');
+//   const [pageNumber, setPageNumber] = useState(1);
+//   const [totalCount, setTotalCount] = useState(0);
+//   const [stats, setStats] = useState({
+//     total: 0,
+//     open: 0,
+//     inProgress: 0,
+//     resolved: 0,
+//     highPriority: 0,
+//   });
+
+//   // Modal state
+//   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+//   const [isModalOpen, setIsModalOpen] = useState(false);
+//   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+//   const pageSize = 10;
+
+//   // Fetch tickets on load and when filters change
+//   useEffect(() => {
+//     if (!user) {
+//       navigate('/login');
+//       return;
+//     }
+
+//     fetchTickets();
+//     fetchStats();
+//   }, [statusFilter, pageNumber, user, navigate]);
+
+//   const fetchTickets = async () => {
+//     try {
+//       setLoading(true);
+//       setError(null);
+
+//       let url = '/tickets/my-tickets';
+//       const params = new URLSearchParams({
+//         pageNumber: pageNumber.toString(),
+//         pageSize: pageSize.toString(),
+//       });
+
+//       if (statusFilter !== 'all') {
+//         url = `/tickets/by-status/${statusFilter}`;
+//       }
+
+//       const fullUrl = `${url}?${params.toString()}`;
+//       const response = await apiClient.get(fullUrl);
+
+//       let ticketsData: TicketListItem[] = [];
+//       let count = 0;
+
+//       if (response.data?.data) {
+//         const paginatedData = response.data.data as PaginatedTicketsResponse;
+//         ticketsData = paginatedData.items || [];
+//         count = paginatedData.totalCount || 0;
+//       } else if (response.data?.items) {
+//         ticketsData = response.data.items || [];
+//         count = response.data.totalCount || 0;
+//       } else if (Array.isArray(response.data)) {
+//         ticketsData = response.data;
+//         count = ticketsData.length;
+//       }
+
+//       setTickets(ticketsData);
+//       setTotalCount(count);
+//     } catch (err: any) {
+//       console.error('Error fetching tickets:', err);
+//       const errorMsg =
+//         err.response?.data?.message ||
+//         err.message ||
+//         'Failed to load tickets';
+//       setError(errorMsg);
+//       setTickets([]);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const fetchStats = async () => {
+//     // Mock stats - replace with actual API call
+//     setStats({
+//       total: totalCount || 24,
+//       open: 8,
+//       inProgress: 5,
+//       resolved: 11,
+//       highPriority: 3,
+//     });
+//   };
+
+//   const handleLogout = () => {
+//     setIsLogoutModalOpen(true);
+//   };
+
+//   const confirmLogout = () => {
+//     setIsLogoutModalOpen(false);
+//     clearAuth();
+//     navigate('/login');
+//   };
+
+//   const handleViewTicket = (ticketId: string) => {
+//     setSelectedTicketId(ticketId);
+//     setIsModalOpen(true);
+//   };
+
+//   const getPriorityColor = (priority: number): string => {
+//     switch (priority) {
+//       case 1:
+//         return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200';
+//       case 2:
+//         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200';
+//       case 3:
+//         return 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200';
+//       case 4:
+//         return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200';
+//       default:
+//         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+//     }
+//   };
+
+//   const getStatusColor = (status: number): string => {
+//     switch (status) {
+//       case 1:
+//         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border-blue-200 dark:border-blue-800';
+//       case 2:
+//         return 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200 border-orange-200 dark:border-orange-800';
+//       case 3:
+//         return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200 border-green-200 dark:border-green-800';
+//       case 4:
+//         return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200 border-red-200 dark:border-red-800';
+//       case 5:
+//         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700';
+//       default:
+//         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700';
+//     }
+//   };
+
+//   const getPriorityBgColor = (priority: number): string => {
+//     switch (priority) {
+//       case 1:
+//         return 'bg-green-50/50 dark:bg-green-950/20';
+//       case 2:
+//         return 'bg-blue-50/50 dark:bg-blue-950/20';
+//       case 3:
+//         return 'bg-orange-50/50 dark:bg-orange-950/20';
+//       case 4:
+//         return 'bg-red-50/50 dark:bg-red-950/20';
+//       default:
+//         return 'bg-gray-50/50 dark:bg-slate-800/50';
+//     }
+//   };
+
+//   const getStatusIcon = (status: number) => {
+//     switch (status) {
+//       case 1:
+//         return (
+//           <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+//             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+//           </svg>
+//         );
+//       case 2:
+//         return (
+//           <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+//             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+//           </svg>
+//         );
+//       case 3:
+//         return (
+//           <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+//             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+//           </svg>
+//         );
+//       default:
+//         return null;
+//     }
+//   };
+
+//   return (
+//     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex">
+//       {/* Mobile Sidebar Overlay */}
+//       {mobileMenuOpen && (
+//         <div 
+//           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+//           onClick={() => setMobileMenuOpen(false)}
+//         />
+//       )}
+
+//       {/* Sidebar */}
+//       <aside 
+//         className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out ${
+//           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+//         } ${sidebarOpen ? 'lg:w-64' : 'lg:w-20'} flex flex-col`}
+//       >
+//         {/* Logo Area */}
+//         <div className={`h-16 flex items-center border-b border-gray-200 dark:border-slate-800 ${sidebarOpen ? 'px-6' : 'lg:px-5 px-6'}`}>
+//           <div className="flex items-center gap-3">
+//             <div className="w-8 h-8 bg-blue-600 dark:bg-blue-700 rounded-lg flex items-center justify-center flex-shrink-0">
+//               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+//               </svg>
+//             </div>
+//             <span className={`font-bold text-xl text-gray-900 dark:text-white transition-opacity duration-200 ${sidebarOpen ? 'opacity-100' : 'lg:opacity-0 lg:w-0 lg:overflow-hidden'}`}>
+//               TicketHub
+//             </span>
+//           </div>
+//         </div>
+
+//         {/* Navigation */}
+//         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+//           {navigation.map((item) => {
+//             const isActive = location.pathname === item.href || (item.href !== '#' && location.pathname.startsWith(item.href));
+//             return (
+//               <a
+//                 key={item.name}
+//                 href={item.href}
+//                 onClick={(e) => {
+//                   if (item.href === '#') {
+//                     e.preventDefault();
+//                     return;
+//                   }
+//                   setMobileMenuOpen(false);
+//                 }}
+//                 className={`group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+//                   isActive 
+//                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-r-2 border-blue-600 dark:border-blue-400' 
+//                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+//                 } ${!sidebarOpen && 'lg:justify-center'}`}
+//                 title={!sidebarOpen ? item.name : undefined}
+//               >
+//                 <svg 
+//                   className={`flex-shrink-0 w-5 h-5 transition-colors ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} 
+//                   fill="none" 
+//                   stroke="currentColor" 
+//                   viewBox="0 0 24 24"
+//                 >
+//                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+//                 </svg>
+//                 <span className={`ml-3 transition-opacity duration-200 ${sidebarOpen ? 'opacity-100' : 'lg:opacity-0 lg:w-0 lg:overflow-hidden'}`}>
+//                   {item.name}
+//                 </span>
+//               </a>
+//             );
+//           })}
+//         </nav>
+
+//         {/* User Profile Section */}
+//         <div className={`border-t border-gray-200 dark:border-slate-800 p-4 ${!sidebarOpen && 'lg:p-2 lg:flex lg:justify-center'}`}>
+//           <div className={`flex items-center gap-3 ${!sidebarOpen && 'lg:flex-col lg:gap-1'}`}>
+//             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+//               {user?.firstName?.[0]}{user?.lastName?.[0]}
+//             </div>
+//             <div className={`flex-1 min-w-0 ${!sidebarOpen && 'lg:hidden'}`}>
+//               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+//                 {user?.firstName} {user?.lastName}
+//               </p>
+//               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+//                 {user?.email}
+//               </p>
+//             </div>
+//             <button 
+//               onClick={handleLogout}
+//               className={`p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors ${!sidebarOpen && 'lg:p-1.5'}`}
+//               title="Logout"
+//             >
+//               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+//               </svg>
+//             </button>
+//           </div>
+//         </div>
+//       </aside>
+
+//       {/* Main Content Area */}
+//       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+//         {/* Top Header */}
+//         <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
+//           <div className="flex items-center gap-4">
+//             {/* Mobile Menu Button */}
+//             <button 
+//               onClick={() => setMobileMenuOpen(true)}
+//               className="lg:hidden p-2 -ml-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg"
+//             >
+//               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+//               </svg>
+//             </button>
+
+//             {/* Sidebar Toggle (Desktop) */}
+//             <button 
+//               onClick={() => setSidebarOpen(!sidebarOpen)}
+//               className="hidden lg:flex p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+//               title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+//             >
+//               <svg 
+//                 className={`w-5 h-5 transition-transform duration-200 ${!sidebarOpen ? 'rotate-180' : ''}`} 
+//                 fill="none" 
+//                 stroke="currentColor" 
+//                 viewBox="0 0 24 24"
+//               >
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+//               </svg>
+//             </button>
+
+//             <div>
+//               <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Tickets</h1>
+//               <p className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">Manage and track your support requests</p>
+//             </div>
+//           </div>
+
+//           <div className="flex items-center gap-3">
+//             <ThemeToggle />
+            
+//             {/* Quick Action */}
+//             <button
+//               onClick={() => navigate('/create-ticket')}
+//               className="hidden sm:flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors shadow-sm hover:shadow-md"
+//             >
+//               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+//               </svg>
+//               New Ticket
+//             </button>
+//           </div>
+//         </header>
+
+//         {/* Dashboard Content */}
+//         <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+//           {/* Stats Grid */}
+//           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+//             <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-gray-200 dark:border-slate-800 shadow-sm">
+//               <div className="flex items-center justify-between mb-3">
+//                 <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tickets</span>
+//                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+//                   <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+//                   </svg>
+//                 </div>
+//               </div>
+//               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+//               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">All time requests</p>
+//             </div>
+
+//             <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-gray-200 dark:border-slate-800 shadow-sm">
+//               <div className="flex items-center justify-between mb-3">
+//                 <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Open</span>
+//                 <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+//                   <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+//                   </svg>
+//                 </div>
+//               </div>
+//               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.open}</p>
+//               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Awaiting response</p>
+//             </div>
+
+//             <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-gray-200 dark:border-slate-800 shadow-sm">
+//               <div className="flex items-center justify-between mb-3">
+//                 <span className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</span>
+//                 <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+//                   <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+//                   </svg>
+//                 </div>
+//               </div>
+//               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.inProgress}</p>
+//               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Being handled</p>
+//             </div>
+
+//             <div className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-gray-200 dark:border-slate-800 shadow-sm">
+//               <div className="flex items-center justify-between mb-3">
+//                 <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Resolved</span>
+//                 <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+//                   <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+//                   </svg>
+//                 </div>
+//               </div>
+//               <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.resolved}</p>
+//               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Completed this month</p>
+//             </div>
+//           </div>
+
+//           {/* Filters & Actions Bar */}
+//           <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-4 mb-6 shadow-sm">
+//             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+//               <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
+//                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Filter:</span>
+//                 <button
+//                   onClick={() => {
+//                     setStatusFilter('all');
+//                     setPageNumber(1);
+//                   }}
+//                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+//                     statusFilter === 'all'
+//                       ? 'bg-blue-600 dark:bg-blue-700 text-white shadow-md'
+//                       : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+//                   }`}
+//                 >
+//                   All
+//                 </button>
+//                 {[1, 2, 3, 4, 5].map((status) => (
+//                   <button
+//                     key={status}
+//                     onClick={() => {
+//                       setStatusFilter(status);
+//                       setPageNumber(1);
+//                     }}
+//                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+//                       statusFilter === status
+//                         ? 'bg-blue-600 dark:bg-blue-700 text-white shadow-md'
+//                         : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+//                     }`}
+//                   >
+//                     {STATUS_LABELS[status as keyof typeof STATUS_LABELS]}
+//                   </button>
+//                 ))}
+//               </div>
+
+//               <div className="flex items-center gap-3">
+//                 <span className="text-sm text-gray-500 dark:text-gray-400">
+//                   Showing <span className="font-semibold text-gray-900 dark:text-white">{tickets.length}</span> of{' '}
+//                   <span className="font-semibold text-gray-900 dark:text-white">{totalCount}</span>
+//                 </span>
+//               </div>
+//             </div>
+//           </div>
+
+//           {/* Loading State */}
+//           {loading && (
+//             <div className="flex justify-center items-center h-64">
+//               <div className="text-center">
+//                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+//                 <p className="text-gray-600 dark:text-gray-400">Loading tickets...</p>
+//               </div>
+//             </div>
+//           )}
+
+//           {/* Error State */}
+//           {error && !loading && (
+//             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 mb-6">
+//               <div className="flex items-start">
+//                 <svg className="w-6 h-6 text-red-600 dark:text-red-400 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+//                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+//                 </svg>
+//                 <div>
+//                   <h3 className="text-red-900 dark:text-red-100 font-semibold mb-1">Failed to load tickets</h3>
+//                   <p className="text-red-700 dark:text-red-200 text-sm">{error}</p>
+//                   <button 
+//                     onClick={fetchTickets}
+//                     className="mt-3 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 underline"
+//                   >
+//                     Try again
+//                   </button>
+//                 </div>
+//               </div>
+//             </div>
+//           )}
+
+//           {/* Tickets Table */}
+//           {!loading && tickets.length > 0 && (
+//             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden">
+//               <div className="overflow-x-auto">
+//                 <table className="w-full">
+//                   <thead className="bg-gray-50/50 dark:bg-slate-800/50 border-b border-gray-200 dark:border-slate-700">
+//                     <tr>
+//                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+//                         Ticket
+//                       </th>
+//                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+//                         Title
+//                       </th>
+//                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+//                         Status
+//                       </th>
+//                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+//                         Priority
+//                       </th>
+//                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+//                         Created
+//                       </th>
+//                       <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+//                         Action
+//                       </th>
+//                     </tr>
+//                   </thead>
+//                   <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+//                     {tickets.map((ticket) => (
+//                       <tr
+//                         key={ticket.id}
+//                         className={`hover:bg-gray-50/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${getPriorityBgColor(ticket.priority)}`}
+//                         onClick={() => handleViewTicket(ticket.id)}
+//                       >
+//                         <td className="px-6 py-4 whitespace-nowrap">
+//                           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+//                             #{ticket.ticketNumber}
+//                           </span>
+//                         </td>
+//                         <td className="px-6 py-4">
+//                           <div className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1">
+//                             {ticket.title}
+//                           </div>
+//                         </td>
+//                         <td className="px-6 py-4 whitespace-nowrap">
+//                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(ticket.status)}`}>
+//                             {getStatusIcon(ticket.status)}
+//                             {STATUS_LABELS[ticket.status as keyof typeof STATUS_LABELS]}
+//                           </span>
+//                         </td>
+//                         <td className="px-6 py-4 whitespace-nowrap">
+//                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getPriorityColor(ticket.priority)}`}>
+//                             {PRIORITY_LEVELS[ticket.priority as keyof typeof PRIORITY_LEVELS]}
+//                           </span>
+//                         </td>
+//                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+//                           {new Date(ticket.createdAt).toLocaleDateString('en-US', {
+//                             month: 'short',
+//                             day: 'numeric',
+//                             year: 'numeric',
+//                           })}
+//                         </td>
+//                         <td className="px-6 py-4 whitespace-nowrap text-right">
+//                           <button
+//                             onClick={(e) => {
+//                               e.stopPropagation();
+//                               handleViewTicket(ticket.id);
+//                             }}
+//                             className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 font-medium text-sm inline-flex items-center gap-1 group"
+//                           >
+//                             View
+//                             <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+//                             </svg>
+//                           </button>
+//                         </td>
+//                       </tr>
+//                     ))}
+//                   </tbody>
+//                 </table>
+//               </div>
+
+//               {/* Pagination */}
+//               {totalCount > pageSize && (
+//                 <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex items-center justify-between">
+//                   <p className="text-sm text-gray-600 dark:text-gray-400">
+//                     Page <span className="font-medium text-gray-900 dark:text-white">{pageNumber}</span> of{' '}
+//                     <span className="font-medium text-gray-900 dark:text-white">{Math.ceil(totalCount / pageSize)}</span>
+//                   </p>
+//                   <div className="flex gap-2">
+//                     <button
+//                       onClick={() => setPageNumber(Math.max(1, pageNumber - 1))}
+//                       disabled={pageNumber === 1}
+//                       className="px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+//                     >
+//                       Previous
+//                     </button>
+//                     <button
+//                       onClick={() => setPageNumber(Math.min(Math.ceil(totalCount / pageSize), pageNumber + 1))}
+//                       disabled={pageNumber >= Math.ceil(totalCount / pageSize)}
+//                       className="px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+//                     >
+//                       Next
+//                     </button>
+//                   </div>
+//                 </div>
+//               )}
+//             </div>
+//           )}
+
+//           {/* Empty State */}
+//           {!loading && tickets.length === 0 && !error && (
+//             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-12 text-center">
+//               <div className="w-20 h-20 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
+//                 <svg className="w-10 h-10 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+//                 </svg>
+//               </div>
+//               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+//                 {statusFilter === 'all' ? 'No tickets yet' : 'No tickets found'}
+//               </h3>
+//               <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+//                 {statusFilter === 'all' 
+//                   ? "You haven't created any support tickets yet. Create your first ticket to get help from our support team."
+//                   : `No tickets with status "${STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS]}" found.`}
+//               </p>
+//               <button
+//                 onClick={() => navigate('/create-ticket')}
+//                 className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-colors shadow-sm hover:shadow-md"
+//               >
+//                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+//                 </svg>
+//                 Create Your First Ticket
+//               </button>
+//             </div>
+//           )}
+//         </main>
+//       </div>
+
+//       {/* Ticket Detail Modal */}
+//       <TicketDetailModal
+//         ticketId={selectedTicketId || ''}
+//         isOpen={isModalOpen}
+//         onClose={() => {
+//           setIsModalOpen(false);
+//           setSelectedTicketId(null);
+//         }}
+//       />
+
+//       {/* Logout Confirmation Modal */}
+//       {isLogoutModalOpen && (
+//         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+//           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200 dark:border-slate-700 transform transition-all">
+//             <div className="p-6">
+//               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+//                 <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+//                 </svg>
+//               </div>
+//               <h3 className="text-xl font-bold text-center text-gray-900 dark:text-white mb-2">Confirm Logout</h3>
+//               <p className="text-center text-gray-600 dark:text-gray-400 mb-6">
+//                 Are you sure you want to log out? You'll need to sign in again to access your tickets.
+//               </p>
+//               <div className="flex gap-3">
+//                 <button
+//                   onClick={() => setIsLogoutModalOpen(false)}
+//                   className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+//                 >
+//                   Cancel
+//                 </button>
+//                 <button
+//                   onClick={confirmLogout}
+//                   className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-lg transition-colors shadow-sm"
+//                 >
+//                   Logout
+//                 </button>
+//               </div>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
