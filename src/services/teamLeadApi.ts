@@ -159,4 +159,21 @@ export const getTicketDetail = async (ticketId: string) => {
     console.error('Error fetching ticket:', errorMessage);
     return { data: null, error: errorMessage };
   }
+
+//   export const uploadTicketAttachment = async (ticketId: string, file: File) => {
+//   try {
+//     const formData = new FormData();
+//     formData.append('file', file);
+
+//     const response = await apiClient.post(`/tickets/${ticketId}/attachments`, formData, {
+//       headers: { 'Content-Type': 'multipart/form-data' },
+//     });
+
+//     return handleApiResponse(response);
+//   } catch (error) {
+//     const errorMessage = handleApiError(error);
+//     return { data: null, error: errorMessage };
+//   }
+// };
+
 };
