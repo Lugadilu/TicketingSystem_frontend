@@ -10,6 +10,7 @@ const ROLE_MAP: Record<string, number> = {
   'TeamLead': 2,
   'Support': 3,
   'SuperAdmin': 1,
+  'Customer': 6, 
 };
 
 // Convert role string to number

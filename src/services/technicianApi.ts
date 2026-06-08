@@ -3,6 +3,14 @@
 import apiClient, { handleApiResponse, handleApiError } from './api';
 import type { User } from '../types';
 
+const ticketStatusMap: Record<string, number> = {
+  Open: 1,
+  InProgress: 2,
+  "In Progress": 2,
+  Resolved: 3,
+  Reopened: 4,
+  Closed: 5,
+};
 // ============ TICKET MANAGEMENT ============
 
 /**
@@ -85,9 +93,16 @@ export const getTicketDetail = async (ticketId: string) => {
  */
 export const updateTicketStatus = async (ticketId: string, status: string) => {
   try {
-    console.log(`Updating ticket ${ticketId} status to ${status}`);
+    const statusValue = ticketStatusMap[status];
+    
+    if (!statusValue) {
+      console.error(`Invalid status: ${status}`);
+      return { data: null, error: `Invalid status: ${status}` };
+    }
+    
+    console.log(`Updating ticket ${ticketId} status to ${status} (value: ${statusValue})`);
     const response = await apiClient.patch(`/tickets/${ticketId}/status`, {
-      status,
+      status: statusValue,  // Send number instead of string
     });
     return handleApiResponse(response);
   } catch (error) {
@@ -97,23 +112,54 @@ export const updateTicketStatus = async (ticketId: string, status: string) => {
   }
 };
 
+// /**
+//  * PATCH /api/tickets/{ticketId}/status
+//  * Change ticket status (start work, mark as in progress, resolve, etc)
+//  */
+// export const updateTicketStatus = async (ticketId: string, status: string) => {
+//   try {
+//     console.log(`Updating ticket ${ticketId} status to ${status}`);
+//     const response = await apiClient.patch(`/tickets/${ticketId}/status`, {
+//       status,
+//     });
+//     return handleApiResponse(response);
+//   } catch (error) {
+//     const errorMessage = handleApiError(error);
+//     console.error('Error updating ticket status:', errorMessage);
+//     return { data: null, error: errorMessage };
+//   }
+// };
+
 /**
  * POST /api/tickets/{ticketId}/comments
  * Add a comment/update to a ticket
  */
-export const addCommentToTicket = async (ticketId: string, comment: string) => {
+export const addComment = async (ticketId: string, comment: string) => {
   try {
-    console.log(`Adding comment to ticket ${ticketId}`);
     const response = await apiClient.post(`/tickets/${ticketId}/comments`, {
-      content: comment,
+      comment,
     });
+
     return handleApiResponse(response);
   } catch (error) {
     const errorMessage = handleApiError(error);
-    console.error('Error adding comment:', errorMessage);
     return { data: null, error: errorMessage };
   }
 };
+export const addCommentToTicket = addComment;
+// export const addCommentToTicket = async (ticketId: string, comment: string) => {
+//   try {
+//     console.log(`Adding comment to ticket ${ticketId}`);
+//     const response = await apiClient.post(`/tickets/${ticketId}/comments`, {
+//       comment,
+//     });
+//     return handleApiResponse(response);
+//   } catch (error) {
+//     const errorMessage = handleApiError(error);
+//     console.error('Error adding comment:', errorMessage);
+//     return { data: null, error: errorMessage };
+//   }
+// };
 
 /**
  * GET /api/tickets/{ticketId}/comments
@@ -135,38 +181,58 @@ export const getTicketComments = async (ticketId: string) => {
  * GET /api/tickets/{ticketId}/activity
  * Get activity log for a ticket
  */
-export const getTicketActivity = async (ticketId: string) => {
-  try {
-    console.log(`Fetching activity for ticket ${ticketId}`);
-    const response = await apiClient.get(`/tickets/${ticketId}/activity`);
-    return handleApiResponse(response);
-  } catch (error) {
-    const errorMessage = handleApiError(error);
-    console.error('Error fetching activity:', errorMessage);
-    return { data: null, error: errorMessage };
-  }
-};
+  export const getTicketActivity = async (ticketId: string) => {
+    try {
+      console.log(`Fetching activity for ticket ${ticketId}`);
+      const response = await apiClient.get(`/tickets/${ticketId}/activity`);
+      return handleApiResponse(response);
+    } catch (error) {
+      const errorMessage = handleApiError(error);
+      console.error('Error fetching activity:', errorMessage);
+      return { data: null, error: errorMessage };
+    }
+  };
 
 /**
  * PUT /api/tickets/{ticketId}
  * Update ticket details (description, priority, etc)
  */
-export const updateTicket = async (
-  ticketId: string,
-  data: {
-    title?: string;
-    description?: string;
-    category?: string;
-    priority?: number;
-  }
-) => {
-  try {
-    console.log(`Updating ticket ${ticketId}`);
-    const response = await apiClient.put(`/tickets/${ticketId}`, data);
-    return handleApiResponse(response);
-  } catch (error) {
-    const errorMessage = handleApiError(error);
-    console.error('Error updating ticket:', errorMessage);
-    return { data: null, error: errorMessage };
-  }
-};
+  export const updateTicket = async (
+    ticketId: string,
+    data: {
+      title?: string;
+      description?: string;
+      category?: string;
+      priority?: number;
+    }
+  ) => {
+    try {
+      console.log(`Updating ticket ${ticketId}`);
+      const response = await apiClient.put(`/tickets/${ticketId}`, data);
+      return handleApiResponse(response);
+    } catch (error) {
+      const errorMessage = handleApiError(error);
+      console.error('Error updating ticket:', errorMessage);
+      return { data: null, error: errorMessage };
+    }
+  };
+
+    export const submitTicketReport = async (
+    ticketId: string,
+    data: {
+      workSummary: string;
+      resolutionSteps: string;
+      partsUsed?: string;
+      timeSpent: string;
+      recommendations?: string;
+      isResolved: boolean;
+      followUpNotes?: string;
+    }
+  ) => {
+    try {
+      const response = await apiClient.post(`/tickets/${ticketId}/report`, data);
+      return handleApiResponse(response);
+    } catch (error) {
+      return { data: null, error: handleApiError(error) };
+    }
+  };

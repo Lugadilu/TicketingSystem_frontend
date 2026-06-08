@@ -78,3 +78,48 @@ export const closeTicket = async (ticketId: string) => {
     return { data: null, error: handleApiError(error) };
   }
 };
+
+export const downloadTicketPdf = async (ticketId: string) => {
+  const response = await apiClient.get(`/tickets/${ticketId}/download`, {
+    responseType: 'blob',
+  });
+
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `ticket-${ticketId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+export const downloadReportPdf = async (ticketId: string) => {
+  const response = await apiClient.get(`/tickets/${ticketId}/report/download`, {
+    responseType: 'blob',
+  });
+
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `ticket-report-${ticketId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+export const downloadTicketWithReportPdf = async (ticketId: string) => {
+  const response = await apiClient.get(`/tickets/${ticketId}/download-with-report`, {
+    responseType: 'blob',
+  });
+
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `ticket-full-report-${ticketId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};

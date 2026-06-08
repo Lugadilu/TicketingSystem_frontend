@@ -86,9 +86,14 @@ export const updateTicketStatus = async (ticketId: string, status: string) => {
  * PATCH /api/tickets/{id}/assign
  * Assign ticket to technician - Support routes work to technicians
  */
-export const assignTicket = async (ticketId: string, technicianId: string) => {
+export const assignTicket = async (
+  ticketId: string,
+  teamLeadUserId: string,
+  technicianId: string
+) => {
   try {
     const response = await apiClient.patch(`/tickets/${ticketId}/assign`, {
+      teamLeadUserId,
       assignedToUserId: technicianId,
     });
     return handleApiResponse(response);
