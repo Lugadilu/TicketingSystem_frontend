@@ -28,6 +28,8 @@ import CustomerDashboard from './pages/customer/CustomerDashboard';
 import TeamLeadDashboard from './pages/teamlead/TeamLeadDashboard';
 import TechnicianDashboard from './pages/technician/TechnicianDashboard';
 import SupportDashboard from './pages/support/SupportDashboard';
+import ViewTransactions from './pages/mpesa/transaction';
+import PayWithMpesa from './pages/mpesa/lipanampesa';
 
 export default function App() {
   const [googleClientId, setGoogleClientId] = useState<string>('');
@@ -187,6 +189,9 @@ export default function App() {
 <Route path="/support/dashboard" element={<SupportDashboard view="overview" />} />
 <Route path="/support/tickets" element={<SupportDashboard view="queue" />} />
 <Route path="/support/analytics" element={<SupportDashboard view="analytics" />} />
+
+<Route path="/mpesa/pay" element={<PayWithMpesa />} />
+<Route path="/mpesa/transactions" element={<ViewTransactions />} />
 
 </Route>
             {/* Catch All */}
