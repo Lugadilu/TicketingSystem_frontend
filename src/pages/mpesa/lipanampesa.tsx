@@ -6,9 +6,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import { Loader2, Smartphone, DollarSign } from 'lucide-react';
+import { Loader2, Smartphone, DollarSign, X } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import type { Socket as SocketType } from 'socket.io-client';
 import { initiateStkPush } from '../../services/mpesaApi';
@@ -16,6 +17,7 @@ import { initiateStkPush } from '../../services/mpesaApi';
 const MySwal = withReactContent(Swal);
 
 const PayWithMpesa = () => {
+  const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -197,7 +199,16 @@ const PayWithMpesa = () => {
 
   return (
     <div className="bg-gradient-to-br from-green-50 to-white min-h-screen flex items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-8">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-8 relative">
+        {/* X Close Button */}
+        <button
+          onClick={() => navigate(-1)}
+          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          aria-label="Close"
+        >
+          <X size={20} />
+        </button>
+
         <div className="text-center mb-10">
           <h1 className="text-3xl font-semibold text-green-700 tracking-tight">
             Pay with M-Pesa
@@ -306,37 +317,54 @@ export default PayWithMpesa;
 
 
 
+// // src/pages/mpesa/lipanampesa.tsx
+// // Pay with M-Pesa page.
+// // Uses apiClient (via mpesaApi) so the JWT token is sent automatically.
+// // Socket.io is kept for real-time callback updates — connect only after
+// // a successful STK push so we don't open idle sockets.
 
-// import { useState, useRef, useEffect, FormEvent } from 'react';
-// import axios from 'axios';
+// import { useState, useRef, useEffect } from 'react';
+// import type { FormEvent } from 'react';
 // import Swal from 'sweetalert2';
 // import withReactContent from 'sweetalert2-react-content';
-// import { Loader2, Smartphone, EuroIcon } from 'lucide-react';
+// import { Loader2, Smartphone, DollarSign } from 'lucide-react';
 // import { io, Socket } from 'socket.io-client';
+// import type { Socket as SocketType } from 'socket.io-client';
+// import { initiateStkPush } from '../../services/mpesaApi';
+
+// const MySwal = withReactContent(Swal);
 
 // const PayWithMpesa = () => {
 //   const [phone, setPhone] = useState('');
 //   const [amount, setAmount] = useState('');
 //   const [loading, setLoading] = useState(false);
-//   const [validationErrors, setValidationErrors] = useState<{ phone?: string; amount?: string }>({});
+//   const [showBubbles, setShowBubbles] = useState(false);
+//   const [validationErrors, setValidationErrors] = useState<{
+//     phone?: string;
+//     amount?: string;
+//   }>({});
 
-//   const API_URL = import.meta.env.VITE_API_URL;
-//   const SOCKET_URL = (import.meta.env.VITE_SOCKET_URL || '').toString();
-//   const socketRef = useRef<Socket | null>(null);
+//   // Socket and timer refs — cleaned up on unmount
+//   const socketRef = useRef<SocketType | null>(null);
 //   const pendingTimerRef = useRef<number | null>(null);
 //   const hardTimeoutRef = useRef<number | null>(null);
-//   const [showBubbles, setShowBubbles] = useState(false);
-//   const MySwal = withReactContent(Swal);
+
+//   // VITE_SOCKET_URL should point to your backend root (not /api)
+//   // e.g. VITE_SOCKET_URL=http://localhost:5072
+//   // If not set, we derive it from the API base URL by stripping /api
+//   const SOCKET_URL =
+//     import.meta.env.VITE_SOCKET_URL ||
+//     'http://localhost:5072';
 
 //   const validateInputs = (): boolean => {
 //     const errors: { phone?: string; amount?: string } = {};
 
 //     if (!/^(01|07)\d{8}$/.test(phone)) {
-//       errors.phone = 'Enter valid 10-digit phone number (e.g. 0712345678)';
+//       errors.phone = 'Enter a valid 10-digit number (e.g. 0712345678)';
 //     }
 
-//     const numericAmount = Number(amount);
-//     if (isNaN(numericAmount) || numericAmount <= 0) {
+//     const num = Number(amount);
+//     if (isNaN(num) || num <= 0) {
 //       errors.amount = 'Enter a valid amount greater than 0';
 //     }
 
@@ -344,187 +372,143 @@ export default PayWithMpesa;
 //     return Object.keys(errors).length === 0;
 //   };
 
-//   const connectSocket = () => {
-//     if (socketRef.current && socketRef.current.connected) return socketRef.current;
-//     // Derive socket URL: prefer VITE_SOCKET_URL, else strip trailing /api from API_URL
-//     const derivedUrl = SOCKET_URL || (API_URL ? API_URL.replace(/\/?api\/?$/, '') : '');
-//     socketRef.current = io(derivedUrl, { transports: ['websocket'] });
-//     return socketRef.current;
-//   };
-
 //   const clearTimers = () => {
-//     if (pendingTimerRef.current) {
-//       window.clearTimeout(pendingTimerRef.current);
-//       pendingTimerRef.current = null;
-//     }
-//     if (hardTimeoutRef.current) {
-//       window.clearTimeout(hardTimeoutRef.current);
-//       hardTimeoutRef.current = null;
-//     }
+//     if (pendingTimerRef.current) window.clearTimeout(pendingTimerRef.current);
+//     if (hardTimeoutRef.current) window.clearTimeout(hardTimeoutRef.current);
+//     pendingTimerRef.current = null;
+//     hardTimeoutRef.current = null;
 //   };
 
+//   // Disconnect socket and clear timers on unmount
 //   useEffect(() => {
 //     return () => {
 //       clearTimers();
-//       setShowBubbles(false);
-//       if (socketRef.current) {
-//         socketRef.current.disconnect();
-//         socketRef.current = null;
-//       }
+//       socketRef.current?.disconnect();
 //     };
 //   }, []);
+
+//   const connectSocket = (): SocketType => {
+//     if (socketRef.current?.connected) return socketRef.current;
+//     socketRef.current = io(SOCKET_URL, { transports: ['websocket'] });
+//     return socketRef.current;
+//   };
 
 //   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 //     e.preventDefault();
 //     setValidationErrors({});
 //     if (!validateInputs()) return;
 
-//     setShowBubbles(false);
 //     setLoading(true);
+//     setShowBubbles(false);
+
+//     // Show processing modal immediately so the user knows something is happening
+//     MySwal.fire({
+//       title: 'Sending Payment Prompt…',
+//       text: 'Please wait while we send the request to Safaricom.',
+//       icon: 'info',
+//       allowOutsideClick: false,
+//       showConfirmButton: false,
+//     });
 
 //     try {
-//       const formattedPhone = '254' + phone.slice(-9);
 //       const numericAmount = Number(amount);
 
-//       MySwal.fire({
-//         title: 'Processing Payment...',
-//         text: 'Please wait while we initiate the STK push.',
-//         icon: 'info',
-//         allowOutsideClick: false,
-//         didOpen: () => {
-//           // Add bouncing bubbles to the modal
-//           const modalContent = document.querySelector('.swal2-html-container');
-//           if (modalContent) {
-//             const bubblesContainer = document.createElement('div');
-//             bubblesContainer.className = 'flex items-center justify-center mt-4';
-//             bubblesContainer.innerHTML = `
-//               <div class="flex items-end space-x-3">
-//                 <span class="w-5 h-5 rounded-full bg-green-500 animate-bounce" style="animation-delay: 0ms"></span>
-//                 <span class="w-5 h-5 rounded-full bg-blue-500 animate-bounce" style="animation-delay: 100ms"></span>
-//                 <span class="w-5 h-5 rounded-full bg-yellow-500 animate-bounce" style="animation-delay: 200ms"></span>
-//                 <span class="w-5 h-5 rounded-full bg-red-500 animate-bounce" style="animation-delay: 300ms"></span>
-//                 <span class="w-5 h-5 rounded-full bg-purple-500 animate-bounce" style="animation-delay: 400ms"></span>
-//               </div>
-//             `;
-//             modalContent.appendChild(bubblesContainer);
-//           }
-//         }
-//       });
+//       // ── Key change ──────────────────────────────────────────────────────────
+//       // We now call our typed mpesaApi function instead of raw axios.
+//       // This uses the shared apiClient which attaches the JWT token automatically.
+//       // The backend normalizes the phone number so we pass it as-is.
+//       // ────────────────────────────────────────────────────────────────────────
+//       const result = await initiateStkPush(
+//         phone,                  // e.g. "0712345678" — backend normalizes to 254...
+//         numericAmount,
+//         'TicketPayment',        // accountReference — customize per use case
+//         'Ticket service payment'
+//       );
 
-//       const response = await axios.post(`${API_URL}/stkpush`, {
-//         phone: formattedPhone,
-//         amount: numericAmount
-//       });
-
-//       console.log('STK Push Response:', response.data);
-//       const { CheckoutRequestID } = response.data || {};
-
-//       // Join socket room by CheckoutRequestID to receive real-time updates
-//       if (CheckoutRequestID) {
-//         const socket = connectSocket();
-
-//         // Remove any prior listener to avoid duplicates
-//         socket.off('transaction_update');
-
-//         socket.emit('join_checkout', { checkoutRequestId: CheckoutRequestID });
-
-//         // Soft pending notice after 45s
-//         pendingTimerRef.current = window.setTimeout(() => {
-//           MySwal.fire({
-//             title: 'Still Pending…',
-//             text: 'If you have not received the prompt, ensure your SIM is active and try again.',
-//             icon: 'info',
-//             confirmButtonText: 'OK'
-//           });
-//         }, 45000);
-
-//         // Hard fallback after 3 minutes if no callback received
-//         hardTimeoutRef.current = window.setTimeout(() => {
-//           setShowBubbles(false);
-//           MySwal.fire({
-//             title: 'Payment Timeout',
-//             text: 'We did not receive a response in time. Please try again.',
-//             icon: 'warning',
-//             confirmButtonText: 'OK'
-//           });
-//         }, 180000);
-
-//         socket.on('transaction_update', (payload: any) => {
-//           clearTimers();
-//           setShowBubbles(false);
-//           const status: string = payload?.status || 'failure';
-//           const desc: string = payload?.resultDesc || 'Payment update received.';
-
-//           // Close loading if open
-//           Swal.close();
-
-//           if (status === 'success') {
-//             MySwal.fire({
-//               title: 'Payment Successful',
-//               text: `KES ${payload?.amount || numericAmount} received. Receipt: ${payload?.receipt || 'N/A'}`,
-//               icon: 'success',
-//               confirmButtonText: 'Great'
-//             });
-//           } else if (status === 'cancelled') {
-//             MySwal.fire({
-//               title: 'Payment Cancelled',
-//               text: 'You cancelled the payment prompt.',
-//               icon: 'error',
-//               confirmButtonText: 'OK'
-//             });
-//           } else if (status === 'wrong_pin') {
-//             MySwal.fire({
-//               title: 'Wrong PIN',
-//               text: 'The PIN entered was incorrect. Please try again.',
-//               icon: 'error',
-//               confirmButtonText: 'Retry'
-//             });
-//           } else if (status === 'insufficient_funds') {
-//             MySwal.fire({
-//               title: 'Insufficient Funds',
-//               text: 'Your M-Pesa balance is insufficient for this transaction.',
-//               icon: 'error',
-//               confirmButtonText: 'OK'
-//             });
-//           } else if (status === 'timeout') {
-//             MySwal.fire({
-//               title: 'Request Timed Out',
-//               text: 'The payment request timed out. Please try again.',
-//               icon: 'warning',
-//               confirmButtonText: 'OK'
-//             });
-//           } else {
-//             MySwal.fire({
-//               title: 'Payment Failed',
-//               text: desc,
-//               icon: 'error',
-//               confirmButtonText: 'OK'
-//             });
-//           }
-//         });
+//       if (!result.success) {
+//         throw new Error(result.message || 'STK Push failed');
 //       }
 
+//       const { CheckoutRequestID } = result.data;
+
+//       Swal.close();
 //       setPhone('');
 //       setAmount('');
 //       setShowBubbles(true);
 
+//       // ── Socket: listen for real-time callback result ─────────────────────
+//       // Your backend needs to emit 'transaction_update' on this socket room
+//       // when the Daraja callback arrives. If you haven't added socket.io to
+//       // your .NET backend yet, the fallback hard-timeout will handle it.
+//       const socket = connectSocket();
+//       socket.off('transaction_update');
+//       socket.emit('join_checkout', { checkoutRequestId: CheckoutRequestID });
+
+//       // Soft reminder after 45s if no response yet
+//       pendingTimerRef.current = window.setTimeout(() => {
+//         MySwal.fire({
+//           title: 'Still Pending…',
+//           text: 'If you have not received the STK prompt, check that your SIM is active and try again.',
+//           icon: 'info',
+//           confirmButtonText: 'OK',
+//         });
+//       }, 45_000);
+
+//       // Hard fallback after 3 minutes — Daraja callbacks usually arrive in <10s
+//       hardTimeoutRef.current = window.setTimeout(() => {
+//         setShowBubbles(false);
+//         MySwal.fire({
+//           title: 'Payment Timeout',
+//           text: 'We did not receive a response from Safaricom. Please try again.',
+//           icon: 'warning',
+//           confirmButtonText: 'OK',
+//         });
+//       }, 180_000);
+
+//       socket.on('transaction_update', (payload: any) => {
+//         clearTimers();
+//         setShowBubbles(false);
+//         Swal.close();
+
+//         const status: string = payload?.status || 'failure';
+
+//         if (status === 'success') {
+//           MySwal.fire({
+//             title: 'Payment Successful',
+//             text: `KES ${payload?.amount ?? numericAmount} received. Receipt: ${payload?.receipt ?? 'N/A'}`,
+//             icon: 'success',
+//             confirmButtonText: 'Done',
+//           });
+//         } else if (status === 'cancelled') {
+//           MySwal.fire({ title: 'Payment Cancelled', text: 'You cancelled the payment.', icon: 'error', confirmButtonText: 'OK' });
+//         } else if (status === 'wrong_pin') {
+//           MySwal.fire({ title: 'Wrong PIN', text: 'Incorrect PIN entered. Please try again.', icon: 'error', confirmButtonText: 'Retry' });
+//         } else if (status === 'insufficient_funds') {
+//           MySwal.fire({ title: 'Insufficient Funds', text: 'Your M-Pesa balance is too low for this transaction.', icon: 'error', confirmButtonText: 'OK' });
+//         } else if (status === 'timeout') {
+//           MySwal.fire({ title: 'Request Timed Out', text: 'The payment request expired. Please try again.', icon: 'warning', confirmButtonText: 'OK' });
+//         } else {
+//           MySwal.fire({ title: 'Payment Failed', text: payload?.resultDesc || 'Payment could not be completed.', icon: 'error', confirmButtonText: 'OK' });
+//         }
+//       });
+
 //     } catch (err: any) {
-//       console.error('STK Push Error:', err);
-//       const backendError = err?.response?.data;
-//       const details = typeof backendError?.details === 'string'
-//         ? backendError?.details
-//         : backendError?.details
-//           ? JSON.stringify(backendError?.details)
-//           : err?.message;
-//       const errorMessage = backendError?.error || 'Payment initiation failed.';
+//       Swal.close();
+//       setShowBubbles(false);
+
+//       // Extract the most useful error message from the backend response
+//       const backendMessage =
+//         err?.response?.data?.message ||
+//         err?.response?.data?.Message ||
+//         err?.message ||
+//         'Payment initiation failed.';
 
 //       MySwal.fire({
 //         title: 'Payment Failed',
-//         html: `${errorMessage}${details ? `<br/><small>${details}</small>` : ''}`,
+//         text: backendMessage,
 //         icon: 'error',
-//         confirmButtonText: 'Try Again'
+//         confirmButtonText: 'Try Again',
 //       });
-//       setShowBubbles(false);
 //     } finally {
 //       setLoading(false);
 //     }
@@ -534,79 +518,100 @@ export default PayWithMpesa;
 //     <div className="bg-gradient-to-br from-green-50 to-white min-h-screen flex items-center justify-center p-4 font-sans">
 //       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-8">
 //         <div className="text-center mb-10">
-//           <h1 className="text-3xl font-semibold text-green-700 tracking-tight">Pay with M-Pesa</h1>
-//           <p className="mt-2 text-slate-500">Enter your details to receive a payment prompt</p>
+//           <h1 className="text-3xl font-semibold text-green-700 tracking-tight">
+//             Pay with M-Pesa
+//           </h1>
+//           <p className="mt-2 text-slate-500">
+//             Enter your details to receive a payment prompt on your phone
+//           </p>
 //         </div>
 
 //         <form onSubmit={handleSubmit} noValidate className="space-y-6">
+//           {/* Phone number */}
 //           <div>
 //             <label htmlFor="phone" className="block text-sm font-semibold text-slate-700 mb-2">
 //               M-Pesa Phone Number
 //             </label>
 //             <div className="relative">
-//               <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-black" />
+//               <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
 //               <input
 //                 id="phone"
 //                 type="tel"
 //                 placeholder="0712345678"
 //                 value={phone}
 //                 onChange={(e) => setPhone(e.target.value)}
-//                 className={`w-full pl-12 pr-4 py-3 rounded-xl border shadow-sm transition focus:ring-2 ${
-//                   validationErrors.phone ? 'border-red-400 focus:ring-red-300' : 'border-slate-300 focus:ring-green-400'
-//                 }`}
 //                 disabled={loading}
+//                 className={`w-full pl-12 pr-4 py-3 rounded-xl border shadow-sm transition focus:outline-none focus:ring-2 ${
+//                   validationErrors.phone
+//                     ? 'border-red-400 focus:ring-red-300'
+//                     : 'border-slate-300 focus:ring-green-400'
+//                 }`}
 //               />
 //             </div>
-//             {validationErrors.phone && <p className="mt-1 text-xs text-red-500">{validationErrors.phone}</p>}
+//             {validationErrors.phone && (
+//               <p className="mt-1 text-xs text-red-500">{validationErrors.phone}</p>
+//             )}
 //           </div>
 
+//           {/* Amount */}
 //           <div>
 //             <label htmlFor="amount" className="block text-sm font-semibold text-slate-700 mb-2">
 //               Amount (KES)
 //             </label>
 //             <div className="relative">
-//               <EuroIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+//               <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
 //               <input
 //                 id="amount"
 //                 type="number"
 //                 placeholder="e.g. 100"
 //                 value={amount}
 //                 onChange={(e) => setAmount(e.target.value)}
-//                 className={`w-full pl-12 pr-4 py-3 rounded-xl border shadow-sm transition focus:ring-2 ${
-//                   validationErrors.amount ? 'border-red-400 focus:ring-red-300' : 'border-slate-300 focus:ring-green-400'
-//                 }`}
 //                 disabled={loading}
+//                 min={1}
+//                 className={`w-full pl-12 pr-4 py-3 rounded-xl border shadow-sm transition focus:outline-none focus:ring-2 ${
+//                   validationErrors.amount
+//                     ? 'border-red-400 focus:ring-red-300'
+//                     : 'border-slate-300 focus:ring-green-400'
+//                 }`}
 //               />
 //             </div>
-//             {validationErrors.amount && <p className="mt-1 text-xs text-red-500">{validationErrors.amount}</p>}
+//             {validationErrors.amount && (
+//               <p className="mt-1 text-xs text-red-500">{validationErrors.amount}</p>
+//             )}
 //           </div>
 
-//           <div className="pt-2">
-//             <button
-//               type="submit"
-//               disabled={loading}
-//               className="w-full flex items-center justify-center py-3 px-4 text-base font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl transition-all duration-300 focus:ring-4 focus:ring-green-300 disabled:bg-green-300 disabled:cursor-not-allowed"
-//             >
-//               {loading ? (
-//                 <>
-//                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-//                   Processing...
-//                 </>
-//               ) : (
-//                 `Pay KES ${Number(amount) || 0}`
-//               )}
-//             </button>
-//           </div>
+//           <button
+//             type="submit"
+//             disabled={loading}
+//             className="w-full flex items-center justify-center py-3 px-4 text-base font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl transition-all focus:ring-4 focus:ring-green-300 disabled:bg-green-300 disabled:cursor-not-allowed"
+//           >
+//             {loading ? (
+//               <>
+//                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+//                 Processing…
+//               </>
+//             ) : (
+//               `Pay KES ${Number(amount) || 0}`
+//             )}
+//           </button>
 //         </form>
 
+//         {/* Animated bubbles shown while waiting for callback */}
 //         {showBubbles && (
-//           <div className="mt-8 flex items-center justify-center">
-//             <div className="flex items-end space-x-3" aria-label="Payment prompt sent, awaiting your confirmation">
-//               <span className="w-5 h-5 rounded-full bg-green-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-//               <span className="w-5 h-5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '100ms' }} />
-//               <span className="w-5 h-5 rounded-full bg-yellow-500 animate-bounce" style={{ animationDelay: '200ms' }} />
-//               <span className="w-5 h-5 rounded-full bg-red-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-//               <span className="w-5 h-5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '400ms' }} />
+//           <div className="mt-8 text-center">
+//             <p className="text-sm text-slate-500 mb-3">
+//               Check your phone and enter your M-Pesa PIN to complete payment
+//             </p>
+//             <div className="flex items-end justify-center space-x-3">
+//               {['bg-green-500', 'bg-blue-500', 'bg-yellow-500', 'bg-red-500', 'bg-purple-500'].map(
+//                 (color, i) => (
+//                   <span
+//                     key={color}
+//                     className={`w-5 h-5 rounded-full ${color} animate-bounce`}
+//                     style={{ animationDelay: `${i * 100}ms` }}
+//                   />
+//                 )
+//               )}
 //             </div>
 //           </div>
 //         )}
@@ -616,3 +621,6 @@ export default PayWithMpesa;
 // };
 
 // export default PayWithMpesa;
+
+
+
